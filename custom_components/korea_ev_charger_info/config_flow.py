@@ -1,7 +1,8 @@
 """Config flow for Korea EV Charger."""
 import logging
+import asyncio
+import async_timeout
 import voluptuous as vol
-import aiohttp
 
 from homeassistant import config_entries
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -28,44 +29,39 @@ class KoreaEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             keyword = user_input[CONF_KEYWORD]
 
             session = async_get_clientsession(self.hass)
-            # WAF 차단 우회를 위한 User-Agent 추가
             headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 "Accept": "application/json"
             }
-            url = "http://apis.data.go.kr/B552584/EvCharger/getChargerInfo"
-            params = {
-                "serviceKey": self.api_key,
-                "pageNo": "1",
-                "numOfRows": "9999",
-                "zscode": zscode,
-                "dataType": "JSON" #[cite: 1]
-            }
+            
+            # https 적용
+            url = f"https://apis.data.go.kr/B552584/EvCharger/getChargerInfo?serviceKey={self.api_key}&pageNo=1&numOfRows=9999&zscode={zscode}&dataType=JSON"
 
             try:
-                async with session.get(url, params=params, headers=headers) as response:
-                    if response.status == 200:
-                        data = await response.json(content_type=None)
-                        items = data.get("items", {}).get("item", [])
-                        
-                        # 검색어로 충전소 필터링[cite: 1]
-                        for item in items:
-                            stat_nm = item.get("statNm", "")
-                            if keyword in stat_nm:
-                                stat_id = item.get("statId") #[cite: 1]
-                                self.stations[stat_id] = f"{stat_nm} ({item.get('busiNm')})" #[cite: 1]
+                # 10초 타임아웃 추가 (무한 뺑뺑이 방지)
+                async with async_timeout.timeout(10):
+                    async with session.get(url, headers=headers) as response:
+                        if response.status == 200:
+                            data = await response.json(content_type=None)
+                            items = data.get("items", {}).get("item", [])
+                            
+                            for item in items:
+                                stat_nm = item.get("statNm", "")
+                                if keyword in stat_nm:
+                                    stat_id = item.get("statId")
+                                    self.stations[stat_id] = f"{stat_nm} ({item.get('busiNm')})"
 
-                        if not self.stations:
-                            errors["base"] = "no_stations"
+                            if not self.stations:
+                                errors["base"] = "no_stations"
+                            else:
+                                return await self.async_step_select_station()
                         else:
-                            return await self.async_step_select_station()
-                    else:
-                        errors["base"] = "cannot_connect"
-            except Exception as e:
-                _LOGGER.error("API 통신 에러: %s", e)
+                            _LOGGER.error("API 응답 에러 상태코드: %s", response.status)
+                            errors["base"] = "cannot_connect"
+            except (asyncio.TimeoutError, Exception) as e:
+                _LOGGER.error("API 통신/타임아웃 에러: %s", e)
                 errors["base"] = "cannot_connect"
 
-        # 입력 폼 스키마 (기본값 세팅)
         data_schema = vol.Schema({
             vol.Required(CONF_API_KEY): str,
             vol.Required(CONF_ZCODE, default="11410"): str,
@@ -82,7 +78,6 @@ class KoreaEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             stat_id = user_input[CONF_STAT_ID]
             stat_nm = self.stations[stat_id]
 
-            # 기기 고유 등록
             await self.async_set_unique_id(stat_id)
             self._abort_if_unique_id_configured()
 
@@ -95,7 +90,6 @@ class KoreaEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 },
             )
 
-        # 동적 드롭다운 생성
         data_schema = vol.Schema({
             vol.Required(CONF_STAT_ID): vol.In(self.stations)
         })

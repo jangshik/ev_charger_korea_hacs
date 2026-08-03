@@ -26,33 +26,26 @@ class KoreaEVCoordinator(DataUpdateCoordinator):
         )
 
     async def _async_update_data(self):
-        """Update data via library."""
-        url = "http://apis.data.go.kr/B552584/EvCharger/getChargerInfo"
-        params = {
-            "serviceKey": self.api_key,
-            "pageNo": "1",
-            "numOfRows": "99",
-            "statId": self.stat_id, #[cite: 1]
-            "dataType": "JSON" #[cite: 1]
-        }
+        """Update data via API."""
+        url = f"https://apis.data.go.kr/B552584/EvCharger/getChargerInfo?serviceKey={self.api_key}&pageNo=1&numOfRows=99&statId={self.stat_id}&dataType=JSON"
+        
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept": "application/json"
         }
 
         try:
-            async with async_timeout.timeout(30):
-                response = await self.session.get(url, params=params, headers=headers)
+            async with async_timeout.timeout(10):
+                response = await self.session.get(url, headers=headers)
                 if response.status != 200:
                     raise UpdateFailed(f"Error communicating with API: {response.status}")
                 
                 data = await response.json(content_type=None)
                 items = data.get("items", {}).get("item", [])
                 
-                # statId 기준 모든 충전기 데이터를 dict 형태로 정리
                 chargers = {}
                 for item in items:
-                    chger_id = item.get("chgerId") #[cite: 1]
+                    chger_id = item.get("chgerId")
                     chargers[chger_id] = item
 
                 return chargers

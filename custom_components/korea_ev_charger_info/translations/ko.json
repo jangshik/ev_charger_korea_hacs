@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "환경부 전기차 충전소 검색",
-        "description": "공공데이터포털 API 키(디코딩)와 지역 코드를 입력하세요.",
+        "description": "공공데이터포털 일반 인증키(인코딩)와 지역 코드를 입력하세요. https://www.data.go.kr/data/15076352/openapi.do",
         "data": {
           "api_key": "API 키 (Decoding)",
           "zscode": "지역구분 상세코드 (예: 11410 서대문구)",
