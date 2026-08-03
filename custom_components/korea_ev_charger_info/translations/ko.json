@@ -1,0 +1,26 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "환경부 전기차 충전소 검색",
+        "description": "공공데이터포털 API 키(디코딩)와 지역 코드를 입력하세요.",
+        "data": {
+          "api_key": "API 키 (Decoding)",
+          "zscode": "지역구분 상세코드 (예: 11410 서대문구)",
+          "search_keyword": "충전소 이름 검색어 (예: 파크뷰)"
+        }
+      },
+      "select_station": {
+        "title": "충전소 선택",
+        "description": "검색된 충전소 중 하나를 선택하세요.",
+        "data": {
+          "stat_id": "충전소 목록"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "서버 연결에 실패했습니다.",
+      "no_stations": "해당 조건으로 검색된 충전소가 없습니다."
+    }
+  }
+}

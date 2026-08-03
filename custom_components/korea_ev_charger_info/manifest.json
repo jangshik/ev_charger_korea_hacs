@@ -1,0 +1,10 @@
+{
+  "domain": "korea_ev",
+  "name": "Korea EV Charger (한국환경공단)",
+  "codeowners": ["@jangshik"],
+  "config_flow": true,
+  "dependencies": [],
+  "iot_class": "cloud_polling",
+  "requirements": [],
+  "version": "0.0.1"
+}

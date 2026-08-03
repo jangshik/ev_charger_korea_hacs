@@ -1,0 +1,20 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Search EV Station",
+        "data": {
+          "api_key": "API Key (Decoding)",
+          "zscode": "Region Code (e.g., 11410)",
+          "search_keyword": "Station Name Keyword"
+        }
+      },
+      "select_station": {
+        "title": "Select Station",
+        "data": {
+          "stat_id": "Station"
+        }
+      }
+    }
+  }
+}
