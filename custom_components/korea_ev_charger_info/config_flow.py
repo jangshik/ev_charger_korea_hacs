@@ -5,15 +5,15 @@ import async_timeout
 import voluptuous as vol
 
 from homeassistant import config_entries
+from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DOMAIN, CONF_API_KEY, CONF_ZCODE, CONF_KEYWORD, CONF_STAT_ID, CONF_STAT_NM
+# REGION_CODES 상수 임포트 추가
+from .const import DOMAIN, CONF_API_KEY, CONF_ZCODE, CONF_KEYWORD, CONF_STAT_ID, CONF_STAT_NM, REGION_CODES
 
 _LOGGER = logging.getLogger(__name__)
 
 class KoreaEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Korea EV Charger."""
-
     VERSION = 1
 
     def __init__(self):
@@ -21,24 +21,22 @@ class KoreaEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self.stations = {}
 
     async def async_step_user(self, user_input=None):
-        """1단계: API 키 및 검색 조건 입력"""
         errors = {}
         if user_input is not None:
+            # 드롭다운에서 선택된 값(5자리 숫자)이 그대로 변수에 들어옵니다.
             self.api_key = user_input[CONF_API_KEY]
             zscode = user_input[CONF_ZCODE]
             keyword = user_input[CONF_KEYWORD]
 
             session = async_get_clientsession(self.hass)
             headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
                 "Accept": "application/json"
             }
             
-            # https 적용
             url = f"https://apis.data.go.kr/B552584/EvCharger/getChargerInfo?serviceKey={self.api_key}&pageNo=1&numOfRows=9999&zscode={zscode}&dataType=JSON"
 
             try:
-                # 10초 타임아웃 추가 (무한 뺑뺑이 방지)
                 async with async_timeout.timeout(10):
                     async with session.get(url, headers=headers) as response:
                         if response.status == 200:
@@ -56,15 +54,27 @@ class KoreaEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             else:
                                 return await self.async_step_select_station()
                         else:
-                            _LOGGER.error("API 응답 에러 상태코드: %s", response.status)
                             errors["base"] = "cannot_connect"
-            except (asyncio.TimeoutError, Exception) as e:
-                _LOGGER.error("API 통신/타임아웃 에러: %s", e)
+            except Exception as e:
+                _LOGGER.error("API Error: %s", e)
                 errors["base"] = "cannot_connect"
+
+        # === 핵심 변경 포인트: UI 스키마 ===
+        # REGION_CODES 딕셔너리를 HA 드롭다운 옵션 형식으로 변환
+        region_options = [
+            selector.SelectOptionDict(value=code, label=name)
+            for code, name in REGION_CODES.items()
+        ]
 
         data_schema = vol.Schema({
             vol.Required(CONF_API_KEY): str,
-            vol.Required(CONF_ZCODE, default="11410"): str,
+            vol.Required(CONF_ZCODE, default="11410"): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=region_options,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    custom_value=True, # 리스트에 없는 지역은 숫자로 직접 타이핑 가능하도록 허용!
+                )
+            ),
             vol.Required(CONF_KEYWORD, default="파크뷰"): str,
         })
 
