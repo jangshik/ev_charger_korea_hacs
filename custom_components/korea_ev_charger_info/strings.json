@@ -2,19 +2,28 @@
   "config": {
     "step": {
       "user": {
-        "title": "Search EV Station",
+        "title": "Search EV Station (Korea)",
+        "description": "Enter your Public Data Portal API key (Encoding) and region code.",
         "data": {
-          "api_key": "API Key (Decoding)",
-          "zscode": "Region Code (e.g., 11410)",
+          "api_key": "API Key (Encoding)",
+          "zscode": "Region Code (Select or Type 5 digits)",
           "search_keyword": "Station Name Keyword"
         }
       },
       "select_station": {
         "title": "Select Station",
+        "description": "Select one of the matched stations from the list.",
         "data": {
-          "stat_id": "Station"
+          "stat_id": "Found Stations"
         }
       }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the server or timed out.",
+      "no_stations": "No stations found with the given keyword and region."
+    },
+    "abort": {
+      "already_configured": "This station is already configured."
     }
   }
 }

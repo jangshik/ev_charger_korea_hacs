@@ -50,9 +50,24 @@ class StationSummarySensor(CoordinatorEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self):
+        charger_data = self.coordinator.data.get(self.chger_id, {})
+        type_code = str(charger_data.get("chgerType", "00"))
+        
+        # 02(AC완속), 08(DC콤보 완속)은 완속으로 분류, 나머지는 급속으로 분류
+        speed_type = "완속" if type_code in ["02", "08"] else "급속"
+        if type_code == "00":
+            speed_type = "알수없음"
+
+        # 출력 용량 포맷팅 (빈 값이면 알수없음 처리)
+        output_kw = charger_data.get("output", "")
+        output_display = f"{output_kw} kW" if output_kw else "알수없음"
+
         return {
-            "total_chargers": len(self.coordinator.data),
-            "station_id": self.stat_id
+            "충전기_타입": TYPE_MAPPING.get(type_code, "알수없음"),
+            "충전속도": speed_type,
+            "출력용량": output_display,
+            "충전방식": charger_data.get("method", "알수없음"), # 단독, 동시(공유) 표기
+            "최종갱신일시": charger_data.get("statUpdDt", "알수없음")
         }
 
 
