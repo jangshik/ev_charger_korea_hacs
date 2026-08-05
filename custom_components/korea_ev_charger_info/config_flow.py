@@ -1,16 +1,24 @@
 """Config flow for Korea EV Charger."""
 import logging
-import asyncio
 import async_timeout
 import voluptuous as vol
 
 from homeassistant import config_entries
+from homeassistant.core import callback
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.core import callback # 최상단 import 추가
-from .const import CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL # import에 추가
 
-from .const import DOMAIN, CONF_API_KEY, CONF_ZCODE, CONF_KEYWORD, CONF_STAT_ID, CONF_STAT_NM, REGION_CODES
+from .const import (
+    DOMAIN,
+    CONF_API_KEY,
+    CONF_ZCODE,
+    CONF_KEYWORD,
+    CONF_STAT_ID,
+    CONF_STAT_NM,
+    REGION_CODES,
+    CONF_SCAN_INTERVAL,
+    DEFAULT_SCAN_INTERVAL
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,9 +30,7 @@ class KoreaEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self.stations = {}
 
     async def async_step_user(self, user_input=None):
-        """1단계: API 키 입력 (최초 1회만 노출)"""
-        
-        # 💡 이전에 등록된 기기에서 API 키를 찾아보고, 존재하면 바로 2단계(검색)로 점프!
+        """1단계: API 키 입력"""
         existing_entries = self._async_current_entries()
         if existing_entries:
             saved_key = existing_entries[0].data.get(CONF_API_KEY)
@@ -88,7 +94,6 @@ class KoreaEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             for code, name in REGION_CODES.items()
         ]
 
-        # 💡 기본값(default)을 모두 제거하여 빈칸으로 시작하게 합니다.
         data_schema = vol.Schema({
             vol.Required(CONF_ZCODE): selector.SelectSelector(
                 selector.SelectSelectorConfig(
@@ -105,7 +110,7 @@ class KoreaEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_select_station(self, user_input=None):
-        """3단계: 검색된 충전소 목록 중 하나를 선택"""
+        """3단계: 충전소 선택"""
         if user_input is not None:
             stat_id = user_input[CONF_STAT_ID]
             stat_nm = self.stations[stat_id]
@@ -129,15 +134,15 @@ class KoreaEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="select_station", data_schema=data_schema
         )
-        # 💡 이 메서드를 KoreaEVConfigFlow 클래스 안쪽(맨 아래)에 추가합니다.
+
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
         return KoreaEVOptionsFlowHandler(config_entry)
 
-# 💡 이 클래스를 파일의 맨 마지막 (KoreaEVConfigFlow 클래스 밖)에 추가합니다.
+
 class KoreaEVOptionsFlowHandler(config_entries.OptionsFlow):
-    """UI에서 옵션을 변경할 때 뜨는 설정 창"""
+    """UI에서 주기 옵션을 변경할 때 뜨는 설정 창"""
     def __init__(self, config_entry):
         self.config_entry = config_entry
 
