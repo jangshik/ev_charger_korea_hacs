@@ -19,17 +19,15 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     entities = []
     
-    # 💡 요청하신 출력 순서대로 엔티티를 추가합니다. (HA 기기 페이지 정렬에 반영됨)
-    
     # 1. 통합 메인 요약 센서 (맨 위: 전체)
     entities.append(StationSummarySensor(coordinator, stat_id))
 
-    # 2~5. 요약 센서들 (급속전체 ➔ 급속사용가능 ➔ 완속전체 ➔ 완속사용가능 순서)
+    # 2~5. 요약 센서들 (급속전체 -> 급속사용가능 -> 완속전체 -> 완속사용가능)
     summary_types = ["fast_total", "fast_available", "slow_total", "slow_available"]
     for s_type in summary_types:
         entities.append(StationDetailSummarySensor(coordinator, stat_id, s_type))
 
-    # 6. 급속 충전기들 (포트 번호순 정렬 후 추가)
+    # 6. 급속 충전기들
     if coordinator.data:
         fast_chargers = [
             chger_id for chger_id, data in coordinator.data.items() 
@@ -38,7 +36,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         for chger_id in sorted(fast_chargers):
             entities.append(ChargerPortSensor(coordinator, stat_id, chger_id))
 
-    # 7. 완속 충전기들 (포트 번호순 정렬 후 추가)
+    # 7. 완속 충전기들
     if coordinator.data:
         slow_chargers = [
             chger_id for chger_id, data in coordinator.data.items() 
@@ -61,21 +59,20 @@ class StationSummarySensor(CoordinatorEntity, SensorEntity):
         self.busi_nm = first_charger.get("busiNm", "알수없음")
         self.stat_nm = first_charger.get("statNm", "알수없음")
         
-        # 💡 네이밍 룰: 충전소명_사업자명_...
-        self._attr_name = f"{self.stat_nm}_{self.busi_nm}_전체_사용가능"
+        # 💡 HA 최신 네이밍 규칙 적용
+        self._attr_has_entity_name = True
+        self._attr_name = "전체_사용가능"
         self._attr_unique_id = f"{stat_id}_summary_v2"
-        
-        # 전체 갯수 아이콘
         self._attr_icon = "mdi:ev-station"
-        
         self._attr_native_unit_of_measurement = "대"
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
     @property
     def device_info(self):
+        # 💡 기기(Device)의 기본 이름을 설정합니다. (나중에 UI에서 변경 가능)
         return DeviceInfo(
             identifiers={(DOMAIN, self.stat_id)},
-            name=self.stat_nm,
+            name=f"{self.stat_nm} ({self.busi_nm})",
             manufacturer=self.busi_nm,
             model="EV Station"
         )
@@ -95,10 +92,6 @@ class StationDetailSummarySensor(CoordinatorEntity, SensorEntity):
         self.stat_id = stat_id
         self.sensor_type = sensor_type
         
-        first_charger = next(iter(coordinator.data.values()), {}) if coordinator.data else {}
-        self.busi_nm = first_charger.get("busiNm", "알수없음")
-        self.stat_nm = first_charger.get("statNm", "알수없음")
-        
         type_names = {
             "fast_total": "급속_전체",
             "fast_available": "급속_사용가능",
@@ -106,15 +99,9 @@ class StationDetailSummarySensor(CoordinatorEntity, SensorEntity):
             "slow_available": "완속_사용가능"
         }
         
-        # 💡 네이밍 룰: 충전소명_사업자명_...
-        self._attr_name = f"{self.stat_nm}_{self.busi_nm}_{type_names[sensor_type]}"
+        self._attr_has_entity_name = True
+        self._attr_name = type_names[sensor_type]
         self._attr_unique_id = f"{stat_id}_{sensor_type}"
-        
-        # 💡 아이콘 적용: 급속(번개), 완속(거북이)
-        if "fast" in sensor_type:
-            self._attr_icon = "mdi:lightning-bolt"
-        else:
-            self._attr_icon = "mdi:tortoise"
             
         self._attr_native_unit_of_measurement = "대"
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -149,6 +136,27 @@ class StationDetailSummarySensor(CoordinatorEntity, SensorEntity):
                 
         return count
 
+    # 💡 새롭게 추가/변경된 아이콘 동적 할당 로직
+    @property
+    def icon(self):
+        # 1. 사용 가능한 자리가 0개일 때는 경고등 아이콘 표출
+        if "available" in self.sensor_type and self.native_value == 0:
+            return "mdi:alert-circle-outline"
+            
+        # 2. 급속 아이콘 (전체: 꽉찬 번개 / 사용가능: 빈 번개)
+        if self.sensor_type == "fast_total":
+            return "mdi:lightning-bolt"
+        elif self.sensor_type == "fast_available":
+            return "mdi:lightning-bolt-outline"
+            
+        # 3. 완속 아이콘 (전체: 꽉찬 플러그 / 사용가능: 빈 플러그)
+        elif self.sensor_type == "slow_total":
+            return "mdi:power-plug"
+        elif self.sensor_type == "slow_available":
+            return "mdi:power-plug-outline"
+            
+        return "mdi:ev-station"
+
 
 class ChargerPortSensor(CoordinatorEntity, SensorEntity):
     """개별 충전기 포트 센서"""
@@ -159,15 +167,13 @@ class ChargerPortSensor(CoordinatorEntity, SensorEntity):
         self.chger_id = chger_id
         
         charger_data = coordinator.data.get(chger_id, {})
-        self.busi_nm = charger_data.get("busiNm", "알수없음")
-        self.stat_nm = charger_data.get("statNm", "알수없음")
-        
         type_code = str(charger_data.get("chgerType", "00"))
+        
         self.speed_kr = "완속" if type_code in ["02", "08"] else "급속"
         self.speed_type = "slow" if type_code in ["02", "08"] else "fast"
         
-        # 💡 네이밍 룰: 충전소명_사업자명_급속/완속_충전기ID
-        self._attr_name = f"{self.stat_nm}_{self.busi_nm}_{self.speed_kr}_{chger_id}"
+        self._attr_has_entity_name = True
+        self._attr_name = f"{self.speed_kr}_{chger_id}"
         self._attr_unique_id = f"{stat_id}_{chger_id}"
 
     @property
@@ -184,10 +190,26 @@ class ChargerPortSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def icon(self):
-        # 💡 아이콘 적용: 급속(ccs1), 완속(tesla)
+        charger_data = self.coordinator.data.get(self.chger_id, {})
+        stat_code = str(charger_data.get("stat", "0"))
+        
+        # 급속 충전기 (CCS1 등)
         if self.speed_type == "fast":
-            return "mdi:ev-plug-ccs1"
-        return "mdi:ev-plug-tesla"
+            if stat_code == "3":  # 충전 중: 꽉 찬 아이콘
+                return "mdi:ev-plug-ccs1"
+            elif stat_code == "2":  # 사용 가능: 아웃라인 아이콘
+                return "mdi:ev-plug-ccs1-outline"
+            else:  # 점검중, 통신이상 등
+                return "mdi:alert-circle-outline"
+                
+        # 완속 충전기 (테슬라 / AC완속 등)
+        else:
+            if stat_code == "3":  # 충전 중: 꽉 찬 아이콘
+                return "mdi:ev-plug-tesla"
+            elif stat_code == "2":  # 사용 가능: 아웃라인 아이콘
+                return "mdi:ev-plug-tesla-outline"
+            else:  # 점검중, 통신이상 등
+                return "mdi:alert-circle-outline"
 
     @property
     def extra_state_attributes(self):
