@@ -1,5 +1,5 @@
 {
-  "domain": "korea_ev",
+  "domain": "korea_ev_charger_info",
   "name": "Korea EV Charger (한국환경공단)",
   "codeowners": ["@jangshik"],
   "config_flow": true,

@@ -1,7 +1,7 @@
 """Constants for the Korea EV Charger integration."""
 from datetime import timedelta
 
-DOMAIN = "korea_ev"
+DOMAIN = "korea_ev_charger_info"
 CONF_API_KEY = "api_key"
 CONF_ZCODE = "zscode"
 CONF_KEYWORD = "search_keyword"
