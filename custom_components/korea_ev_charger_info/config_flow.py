@@ -7,6 +7,8 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.core import callback # 최상단 import 추가
+from .const import CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL # import에 추가
 
 from .const import DOMAIN, CONF_API_KEY, CONF_ZCODE, CONF_KEYWORD, CONF_STAT_ID, CONF_STAT_NM, REGION_CODES
 
@@ -127,3 +129,26 @@ class KoreaEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="select_station", data_schema=data_schema
         )
+        # 💡 이 메서드를 KoreaEVConfigFlow 클래스 안쪽(맨 아래)에 추가합니다.
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        return KoreaEVOptionsFlowHandler(config_entry)
+
+# 💡 이 클래스를 파일의 맨 마지막 (KoreaEVConfigFlow 클래스 밖)에 추가합니다.
+class KoreaEVOptionsFlowHandler(config_entries.OptionsFlow):
+    """UI에서 옵션을 변경할 때 뜨는 설정 창"""
+    def __init__(self, config_entry):
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        current_interval = self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+
+        data_schema = vol.Schema({
+            vol.Required(CONF_SCAN_INTERVAL, default=current_interval): int,
+        })
+
+        return self.async_show_form(step_id="init", data_schema=data_schema)

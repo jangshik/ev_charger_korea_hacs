@@ -1,6 +1,7 @@
 """DataUpdateCoordinator for Korea EV Charger."""
 import logging
 import async_timeout
+from datetime import timedelta # 상단 추가
 
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -22,7 +23,7 @@ class KoreaEVCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=UPDATE_INTERVAL,
+            update_interval=timedelta(minutes=interval), # 동적 주기 반영
         )
 
     async def _async_update_data(self):

@@ -8,8 +8,8 @@ CONF_KEYWORD = "search_keyword"
 CONF_STAT_ID = "stat_id"
 CONF_STAT_NM = "stat_nm"
 
-# 공공데이터 API 제한 (일일 1000회) 고려 3분 주기
-UPDATE_INTERVAL = timedelta(minutes=3)
+CONF_SCAN_INTERVAL = "scan_interval"
+DEFAULT_SCAN_INTERVAL = 3
 
 # 상태 코드 매핑[cite: 1]
 STAT_MAPPING = {
