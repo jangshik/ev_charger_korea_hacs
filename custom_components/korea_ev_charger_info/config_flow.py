@@ -20,9 +20,33 @@ class KoreaEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self.stations = {}
 
     async def async_step_user(self, user_input=None):
+        """1단계: API 키 입력 (최초 1회만 노출)"""
+        
+        # 💡 이전에 등록된 기기에서 API 키를 찾아보고, 존재하면 바로 2단계(검색)로 점프!
+        existing_entries = self._async_current_entries()
+        if existing_entries:
+            saved_key = existing_entries[0].data.get(CONF_API_KEY)
+            if saved_key:
+                self.api_key = saved_key
+                return await self.async_step_search()
+
         errors = {}
         if user_input is not None:
             self.api_key = user_input[CONF_API_KEY]
+            return await self.async_step_search()
+
+        data_schema = vol.Schema({
+            vol.Required(CONF_API_KEY): str,
+        })
+
+        return self.async_show_form(
+            step_id="user", data_schema=data_schema, errors=errors
+        )
+
+    async def async_step_search(self, user_input=None):
+        """2단계: 지역 및 검색어 입력"""
+        errors = {}
+        if user_input is not None:
             zscode = user_input[CONF_ZCODE]
             keyword = user_input[CONF_KEYWORD]
 
@@ -57,39 +81,29 @@ class KoreaEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.error("API Error: %s", e)
                 errors["base"] = "cannot_connect"
 
-        # === 💡 변경 포인트: 기존 API 키 불러오기 ===
-        existing_entries = self._async_current_entries()
-        saved_api_key = ""
-        if existing_entries:
-            # 이전에 등록된 첫 번째 기기에서 API 키를 가져옵니다.
-            saved_api_key = existing_entries[0].data.get(CONF_API_KEY, "")
-
-        # 스키마 구성: API 키가 있으면 default 값으로 박아줍니다.
-        api_key_schema = vol.Required(CONF_API_KEY, default=saved_api_key) if saved_api_key else vol.Required(CONF_API_KEY)
-
         region_options = [
             selector.SelectOptionDict(value=code, label=name)
             for code, name in REGION_CODES.items()
         ]
 
+        # 💡 기본값(default)을 모두 제거하여 빈칸으로 시작하게 합니다.
         data_schema = vol.Schema({
-            api_key_schema: str,
-            vol.Required(CONF_ZCODE, default="11410"): selector.SelectSelector(
+            vol.Required(CONF_ZCODE): selector.SelectSelector(
                 selector.SelectSelectorConfig(
                     options=region_options,
                     mode=selector.SelectSelectorMode.DROPDOWN,
                     custom_value=True,
                 )
             ),
-            vol.Required(CONF_KEYWORD, default="파크뷰"): str,
+            vol.Required(CONF_KEYWORD): str,
         })
 
         return self.async_show_form(
-            step_id="user", data_schema=data_schema, errors=errors
+            step_id="search", data_schema=data_schema, errors=errors
         )
 
     async def async_step_select_station(self, user_input=None):
-        """2단계: 검색된 충전소 목록 중 하나를 선택"""
+        """3단계: 검색된 충전소 목록 중 하나를 선택"""
         if user_input is not None:
             stat_id = user_input[CONF_STAT_ID]
             stat_nm = self.stations[stat_id]

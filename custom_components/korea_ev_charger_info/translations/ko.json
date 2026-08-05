@@ -2,12 +2,18 @@
   "config": {
     "step": {
       "user": {
-        "title": "환경부 전기차 충전소 검색",
-        "description": "공공데이터포털 일반 인증키(Encoding)와 검색할 지역을 입력하세요.\n\n💡 *이전에 입력한 API 키가 있다면 자동으로 불러옵니다.*",
+        "title": "API 키 설정",
+        "description": "공공데이터포털 일반 인증키(Encoding)를 입력하세요.\n이 작업은 최초 1회만 진행됩니다.",
         "data": {
-          "api_key": "API 키 (Encoding)",
+          "api_key": "API 키 (Encoding)"
+        }
+      },
+      "search": {
+        "title": "충전소 검색",
+        "description": "검색할 지역을 선택하고 충전소 이름을 입력하세요.",
+        "data": {
           "zscode": "지역 선택 (또는 지역코드 5자리 직접 입력)",
-          "search_keyword": "충전소 이름 검색어 (예: 파크뷰)"
+          "search_keyword": "충전소 이름 검색어 (일부만 입력 가능)"
         }
       },
       "select_station": {
