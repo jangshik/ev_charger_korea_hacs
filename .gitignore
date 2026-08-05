@@ -1,1 +1,19 @@
-./custom_components/korea_ev_charger_info/get_gu_codes.py
+# Python 캐시 파일 (업로드 시 지저분해짐 방지)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS 임시 파일
+.DS_Store
+Thumbs.db
+
+# 앞서 터미널에서 작업하며 생성한 로컬 스크립트 및 데이터 파일들
+get_region_codes.py
+get_gu_codes.py
+all_region_codes.json
+incheon_seo_gu.json
+gu_codes_dict.txt
+
+# 에디터 설정 파일
+.vscode/
+.idea/
