@@ -195,20 +195,20 @@ class ChargerPortSensor(CoordinatorEntity, SensorEntity):
         
         # 급속 충전기 (CCS1 등)
         if self.speed_type == "fast":
-            if stat_code == "3":  # 충전 중: 꽉 찬 아이콘
+            if stat_code == "3":  # 충전 중: 꽉 찬 전용 플러그
                 return "mdi:ev-plug-ccs1"
-            elif stat_code == "2":  # 사용 가능: 아웃라인 아이콘
-                return "mdi:ev-plug-ccs1-outline"
-            else:  # 점검중, 통신이상 등
+            elif stat_code == "2":  # 사용 가능: 빈 번개 모양 (대기 중)
+                return "mdi:lightning-bolt-outline"
+            else:  # 점검중, 통신이상 등: 경고 모양
                 return "mdi:alert-circle-outline"
                 
         # 완속 충전기 (테슬라 / AC완속 등)
         else:
-            if stat_code == "3":  # 충전 중: 꽉 찬 아이콘
+            if stat_code == "3":  # 충전 중: 꽉 찬 전용 플러그
                 return "mdi:ev-plug-tesla"
-            elif stat_code == "2":  # 사용 가능: 아웃라인 아이콘
-                return "mdi:ev-plug-tesla-outline"
-            else:  # 점검중, 통신이상 등
+            elif stat_code == "2":  # 사용 가능: 빈 일반 플러그 (대기 중)
+                return "mdi:power-plug-outline"
+            else:  # 점검중, 통신이상 등: 경고 모양
                 return "mdi:alert-circle-outline"
 
     @property
