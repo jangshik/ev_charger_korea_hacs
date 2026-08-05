@@ -3,106 +3,117 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import DeviceInfo
 
-from .const import DOMAIN, CONF_STAT_ID, CONF_STAT_NM, STAT_MAPPING, TYPE_MAPPING
+from .const import DOMAIN, CONF_STAT_ID, STAT_MAPPING, TYPE_MAPPING
+
+def format_dt(dt_str):
+    """14자리 시간 문자열(YYYYMMDDHHMMSS)을 보기 좋게 변환합니다."""
+    if not dt_str or len(str(dt_str)) != 14:
+        return dt_str
+    dt = str(dt_str)
+    return f"{dt[:4]}-{dt[4:6]}-{dt[6:8]} {dt[8:10]}:{dt[10:12]}:{dt[12:14]}"
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the sensor platform."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
     stat_id = entry.data[CONF_STAT_ID]
-    stat_nm = entry.data[CONF_STAT_NM]
 
     entities = []
-    # 1. 충전소 통합 상태 센서 (사용 가능한 완속/급속 개수 요약)
-    entities.append(StationSummarySensor(coordinator, stat_id, stat_nm))
+    
+    # 1. 충전소 통합 상태 센서 (요약 센서)
+    entities.append(StationSummarySensor(coordinator, stat_id))
 
     # 2. 각 개별 충전기 포트별 센서 생성
-    for chger_id in coordinator.data:
-        entities.append(ChargerPortSensor(coordinator, stat_id, stat_nm, chger_id))
+    if coordinator.data:
+        for chger_id in coordinator.data:
+            entities.append(ChargerPortSensor(coordinator, stat_id, chger_id))
 
     async_add_entities(entities)
 
 
 class StationSummarySensor(CoordinatorEntity, SensorEntity):
-    """충전소 전체 사용 가능한 충전기 수 (메인 센서)"""
+    """충전소 전체 사용 가능한 충전기 수 (요약 메인 센서)"""
 
-    def __init__(self, coordinator, stat_id, stat_nm):
+    def __init__(self, coordinator, stat_id):
         super().__init__(coordinator)
         self.stat_id = stat_id
-        self.stat_nm = stat_nm
-        self._attr_name = f"{stat_nm} 사용 가능"
+        
+        # API에서 실제 사업자명과 충전소명을 동적으로 가져옵니다.
+        first_charger = next(iter(coordinator.data.values()), {}) if coordinator.data else {}
+        self.busi_nm = first_charger.get("busiNm", "알수없음")
+        self.stat_nm = first_charger.get("statNm", "알수없음")
+        
+        # 엔티티 이름 룰 적용
+        self._attr_name = f"{self.busi_nm}_{self.stat_nm}_요약"
         self._attr_unique_id = f"{stat_id}_summary"
         self._attr_icon = "mdi:ev-station"
+        
+        # 💡 '사용할 수 없음' 에러 방지를 위해 단위를 명시합니다.
+        self._attr_native_unit_of_measurement = "대"
 
     @property
     def device_info(self):
         return DeviceInfo(
             identifiers={(DOMAIN, self.stat_id)},
             name=self.stat_nm,
-            manufacturer="환경부 공공데이터",
+            manufacturer=self.busi_nm,
             model="EV Station"
         )
 
     @property
     def native_value(self):
-        # 상태(stat)가 2(사용가능)인 개수 총합 계산[cite: 1]
-        available = sum(1 for charger in self.coordinator.data.values() if str(charger.get("stat")) == "2")
-        return available
+        # 데이터가 없을 경우 안전하게 0 반환
+        if not self.coordinator.data:
+            return 0
+        # 사용가능(2) 상태인 충전기 개수 카운트
+        return sum(1 for charger in self.coordinator.data.values() if str(charger.get("stat")) == "2")
 
     @property
     def extra_state_attributes(self):
-        charger_data = self.coordinator.data.get(self.chger_id, {})
-        type_code = str(charger_data.get("chgerType", "00"))
-        
-        # 02(AC완속), 08(DC콤보 완속)은 완속으로 분류, 나머지는 급속으로 분류
-        speed_type = "완속" if type_code in ["02", "08"] else "급속"
-        if type_code == "00":
-            speed_type = "알수없음"
-
-        # 출력 용량 포맷팅 (빈 값이면 알수없음 처리)
-        output_kw = charger_data.get("output", "")
-        output_display = f"{output_kw} kW" if output_kw else "알수없음"
-
+        total = len(self.coordinator.data) if self.coordinator.data else 0
         return {
-            "충전기_타입": TYPE_MAPPING.get(type_code, "알수없음"),
-            "충전속도": speed_type,
-            "출력용량": output_display,
-            "충전방식": charger_data.get("method", "알수없음"), # 단독, 동시(공유) 표기
-            "최종갱신일시": charger_data.get("statUpdDt", "알수없음")
+            "전체_충전기_수": total,
+            "충전소ID": self.stat_id
         }
 
 
 class ChargerPortSensor(CoordinatorEntity, SensorEntity):
     """개별 충전기 포트 센서"""
 
-    def __init__(self, coordinator, stat_id, stat_nm, chger_id):
+    def __init__(self, coordinator, stat_id, chger_id):
         super().__init__(coordinator)
         self.stat_id = stat_id
-        self.stat_nm = stat_nm
         self.chger_id = chger_id
-        self._attr_name = f"{stat_nm} 충전기 {chger_id}번"
-        self._attr_unique_id = f"{stat_id}_charger_{chger_id}"
+        
+        # 초기화 시 API 데이터 추출
+        charger_data = coordinator.data.get(chger_id, {})
+        self.busi_nm = charger_data.get("busiNm", "알수없음")
+        self.stat_nm = charger_data.get("statNm", "알수없음")
+        
+        # 완속/급속 판단 (02, 08은 완속, 나머지는 급속)
+        type_code = str(charger_data.get("chgerType", "00"))
+        self.speed_type = "slow" if type_code in ["02", "08"] else "fast"
+        
+        # 💡 사용자 요청 네이밍 룰 반영: 사업자명_충전소명_fast/slow_충전기ID
+        self._attr_name = f"{self.busi_nm}_{self.stat_nm}_{self.speed_type}_{chger_id}"
+        self._attr_unique_id = f"{stat_id}_{chger_id}"
 
     @property
     def device_info(self):
-        # StationSummarySensor와 동일한 식별자를 사용하여 하나의 기기 밑으로 종속시킴
         return DeviceInfo(
             identifiers={(DOMAIN, self.stat_id)},
         )
 
     @property
     def native_value(self):
-        # 개별 충전기 상태값 가져오기 (예: "2")[cite: 1]
         charger_data = self.coordinator.data.get(self.chger_id, {})
         stat_code = str(charger_data.get("stat", "0"))
-        # 코드를 사람이 읽기 쉬운 텍스트로 변환[cite: 1]
         return STAT_MAPPING.get(stat_code, "알수없음")
 
     @property
     def icon(self):
-        # 충전 중(3)일 때 아이콘 변경[cite: 1]
         charger_data = self.coordinator.data.get(self.chger_id, {})
         if str(charger_data.get("stat")) == "3":
-            return "mdi:ev-plug-type2"
+            return "mdi:ev-plug-type2" # 충전중
         return "mdi:ev-plug-type2"
 
     @property
@@ -110,8 +121,18 @@ class ChargerPortSensor(CoordinatorEntity, SensorEntity):
         charger_data = self.coordinator.data.get(self.chger_id, {})
         type_code = str(charger_data.get("chgerType", "00"))
         
+        speed_kr = "완속" if self.speed_type == "slow" else "급속"
+        output_kw = charger_data.get("output", "")
+        output_display = f"{output_kw} kW" if output_kw else "알수없음"
+
+        # 💡 요청하신 모든 날짜/시간 정보를 보기 좋게 포맷팅하여 속성에 추가
         return {
-            "charger_type": TYPE_MAPPING.get(type_code, "알수없음"), #[cite: 1]
-            "output_kw": charger_data.get("output", "알수없음"), #[cite: 1]
-            "last_updated": charger_data.get("statUpdDt", "알수없음") #[cite: 1]
+            "충전기_타입": TYPE_MAPPING.get(type_code, "알수없음"),
+            "충전속도": speed_kr,
+            "출력용량": output_display,
+            "충전방식": charger_data.get("method", "알수없음"),
+            "마지막_충전시작일시": format_dt(charger_data.get("lastTsdt")),
+            "마지막_충전종료일시": format_dt(charger_data.get("lastTedt")),
+            "충전중_시작일시": format_dt(charger_data.get("nowTsdt")),
+            "최종갱신일시": format_dt(charger_data.get("statUpdDt"))
         }
