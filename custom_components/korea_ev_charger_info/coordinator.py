@@ -14,10 +14,11 @@ _LOGGER = logging.getLogger(__name__)
 class KoreaEVCoordinator(DataUpdateCoordinator):
     """Class to manage fetching EV charger data."""
 
-    def __init__(self, hass, api_key, stat_id, interval):
+    def __init__(self, hass, api_key, stat_id, interval, timeout):
         """Initialize."""
         self.api_key = api_key
         self.stat_id = stat_id
+        self.timeout_sec = timeout # 💡 타임아웃 저장
         self.session = async_get_clientsession(hass)
 
         super().__init__(
@@ -32,18 +33,19 @@ class KoreaEVCoordinator(DataUpdateCoordinator):
         url = f"https://apis.data.go.kr/B552584/EvCharger/getChargerInfo?serviceKey={self.api_key}&pageNo=1&numOfRows=99&statId={self.stat_id}&dataType=JSON"
         
         try:
-            # HA 최신 버전 권장 방식인 asyncio.timeout 적용
-            async with asyncio.timeout(10):
+            # 💡 UI에서 설정한 동적 타임아웃 적용 (기본 20초)
+            async with asyncio.timeout(self.timeout_sec):
                 async with self.session.get(url) as response:
                     if response.status != 200:
-                        raise UpdateFailed(f"API 통신 에러 발생: {response.status}")
+                        _LOGGER.warning("API 통신 지연 또는 상태 에러(%s). 이전 센서 데이터를 유지합니다.", response.status)
+                        return self.data # 💡 에러 시 기존 데이터 반환
                     
                     data = await response.json(content_type=None)
                     items = data.get("items", {}).get("item", [])
                     
                     if not items:
-                        _LOGGER.warning("해당 충전소(%s)의 데이터를 찾을 수 없습니다.", self.stat_id)
-                        return {}
+                        _LOGGER.warning("해당 충전소 데이터를 찾을 수 없습니다. 이전 데이터를 유지합니다.")
+                        return self.data # 💡 데이터 누락 시에도 기존 데이터 반환
                         
                     chargers = {}
                     for item in items:
@@ -54,4 +56,6 @@ class KoreaEVCoordinator(DataUpdateCoordinator):
                     return chargers
 
         except Exception as err:
-            raise UpdateFailed(f"API 통신 중 예외 발생: {err}")
+            _LOGGER.warning("API 통신 중 예외 발생(%s). 이전 센서 데이터를 유지합니다.", err)
+            # 💡 통신 타임아웃, JSON 파싱 에러 등 모든 예외 상황에서도 기존 데이터 반환
+            return self.data

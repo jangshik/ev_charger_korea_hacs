@@ -7,9 +7,10 @@ CONF_ZCODE = "zscode"
 CONF_KEYWORD = "search_keyword"
 CONF_STAT_ID = "stat_id"
 CONF_STAT_NM = "stat_nm"
-
 CONF_SCAN_INTERVAL = "scan_interval"
 DEFAULT_SCAN_INTERVAL = 3
+CONF_TIMEOUT = "timeout"
+DEFAULT_TIMEOUT = 20
 
 # 상태 코드 매핑[cite: 1]
 STAT_MAPPING = {

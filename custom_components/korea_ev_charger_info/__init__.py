@@ -6,7 +6,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.const import Platform
 
-from .const import DOMAIN, CONF_API_KEY, CONF_STAT_ID, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+from .const import DOMAIN, CONF_API_KEY, CONF_STAT_ID, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, CONF_TIMEOUT, DEFAULT_TIMEOUT
 from .coordinator import KoreaEVCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -22,8 +22,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     # 옵션에 저장된 주기를 가져옵니다. (없으면 기본값 적용)
     interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+    timeout = entry.options.get(CONF_TIMEOUT, DEFAULT_TIMEOUT) # 💡 타임아웃 값 가져오기
 
-    coordinator = KoreaEVCoordinator(hass, api_key, stat_id, interval)
+    coordinator = KoreaEVCoordinator(hass, api_key, stat_id, interval, timeout)
     await coordinator.async_config_entry_first_refresh()
 
     hass.data[DOMAIN][entry.entry_id] = coordinator

@@ -17,7 +17,9 @@ from .const import (
     CONF_STAT_NM,
     REGION_CODES,
     CONF_SCAN_INTERVAL,
-    DEFAULT_SCAN_INTERVAL
+    DEFAULT_SCAN_INTERVAL,
+    CONF_TIMEOUT,         # 💡 추가
+    DEFAULT_TIMEOUT       # 💡 추가
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -157,6 +159,7 @@ class KoreaEVOptionsFlowHandler(config_entries.OptionsFlow):
 
         data_schema = vol.Schema({
             vol.Required(CONF_SCAN_INTERVAL, default=current_interval): int,
+            vol.Required(CONF_TIMEOUT, default=current_timeout): int, # 💡 추가
         })
 
         return self.async_show_form(step_id="init", data_schema=data_schema)
