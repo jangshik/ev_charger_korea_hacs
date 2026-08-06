@@ -147,19 +147,19 @@ class KoreaEVOptionsFlowHandler(config_entries.OptionsFlow):
     """UI에서 주기 옵션을 변경할 때 뜨는 설정 창"""
     
     def __init__(self, config_entry):
-        # 💡 HA 최신 버전에서는 config_entry가 내장 속성이므로 강제 할당을 하면 안 됩니다.
         pass
 
     async def async_step_init(self, user_input=None):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        # __init__에서 할당하지 않아도, HA 코어가 self.config_entry에 자동으로 값을 넣어줍니다.
+        # 💡 [필수] 아래 두 줄이 누락되면 NameError가 발생합니다!
         current_interval = self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        current_timeout = self.config_entry.options.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
 
         data_schema = vol.Schema({
             vol.Required(CONF_SCAN_INTERVAL, default=current_interval): int,
-            vol.Required(CONF_TIMEOUT, default=current_timeout): int, # 💡 추가
+            vol.Required(CONF_TIMEOUT, default=current_timeout): int,
         })
 
         return self.async_show_form(step_id="init", data_schema=data_schema)
